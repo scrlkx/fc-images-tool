@@ -21,21 +21,25 @@ _SCRIPT = _PROJECT_DIR / "convert_images.py"
 _STRINGS = {
     "pt": {
         "prepare":          "Preparar Imagens",
-        "prepare_tip":      "Converte formatos e remove fundos usando IA",
+        "prepare_tip":      "Converte formatos, remove fundos e recorta objetos usando IA",
         "convert":          "Converter Formatos",
         "convert_tip":      "Converte WebP/AVIF/JPEG para PNG, sem remover fundos",
         "remove_bg":        "Remover Fundos",
         "remove_bg_tip":    "Remove fundos dos PNGs existentes usando IA",
+        "crop":             "Recortar Objetos",
+        "crop_tip":         "Remove bordas transparentes ao redor dos objetos nos PNGs",
         "done":             "Concluído",
         "press_enter":      "Pressione Enter para fechar...",
     },
     "en": {
         "prepare":          "Prepare Images",
-        "prepare_tip":      "Convert formats and remove backgrounds using AI",
+        "prepare_tip":      "Convert formats, remove backgrounds, and crop objects using AI",
         "convert":          "Convert Formats",
         "convert_tip":      "Convert WebP/AVIF/JPEG to PNG, keeping backgrounds",
         "remove_bg":        "Remove Backgrounds",
         "remove_bg_tip":    "Remove backgrounds from existing PNGs using AI",
+        "crop":             "Crop Objects",
+        "crop_tip":         "Trim transparent padding around objects in PNGs",
         "done":             "Done",
         "press_enter":      "Press Enter to close...",
     },
@@ -100,9 +104,10 @@ class FcImagesMenuProvider(GObject.GObject, Nautilus.MenuProvider):
         directory = _uri_to_path(files[0].get_uri())
 
         items = [
-            ("FcImages::prepare",   _T["prepare"],   _T["prepare_tip"],   None,                directory),
-            ("FcImages::convert",   _T["convert"],   _T["convert_tip"],   "--keep-background", directory),
+            ("FcImages::prepare",   _T["prepare"],   _T["prepare_tip"],   None,                 directory),
+            ("FcImages::convert",   _T["convert"],   _T["convert_tip"],   "--keep-background",  directory),
             ("FcImages::remove_bg", _T["remove_bg"], _T["remove_bg_tip"], "--backgrounds-only", directory),
+            ("FcImages::crop",      _T["crop"],      _T["crop_tip"],      "--crop-only",        directory),
         ]
 
         menu_items = []

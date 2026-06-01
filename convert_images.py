@@ -74,11 +74,35 @@ def remove_backgrounds(directory: Path) -> None:
             print(f"Failed background removal: {png.name} ({e})", file=sys.stderr)
 
 
+def crop_objects(directory: Path) -> None:
+    pngs = sorted(
+        f for f in directory.iterdir() if f.is_file() and f.suffix.lower() == ".png"
+    )
+
+    if not pngs:
+        print("No PNG files found for cropping.")
+        return
+
+    for png in pngs:
+        try:
+            with Image.open(png) as img:
+                if img.mode != "RGBA":
+                    continue
+                bbox = img.getbbox()
+                if bbox is None or bbox == (0, 0, img.width, img.height):
+                    continue
+                cropped = img.crop(bbox)
+            cropped.save(png, format="PNG")
+            print(f"Cropped: {png.name}")
+        except Exception as e:
+            print(f"Failed cropping: {png.name} ({e})", file=sys.stderr)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Convert WebP, AVIF, and JPEG images to PNG, then remove backgrounds "
-            "from all PNGs in the directory using birefnet-general segmentation."
+            "Convert WebP, AVIF, and JPEG images to PNG, remove backgrounds, "
+            "and crop transparent padding using birefnet-general segmentation."
         )
     )
     parser.add_argument(
@@ -88,20 +112,28 @@ def main() -> None:
     group.add_argument(
         "--keep-background",
         action="store_true",
-        help="Skip background removal; only perform format conversion.",
+        help="Skip background removal and cropping; only perform format conversion.",
     )
     group.add_argument(
         "--backgrounds-only",
         action="store_true",
         help="Skip format conversion; only perform background removal on existing PNGs.",
     )
+    group.add_argument(
+        "--crop-only",
+        action="store_true",
+        help="Skip conversion and background removal; only crop transparent padding from existing PNGs.",
+    )
     args = parser.parse_args()
 
-    if not args.backgrounds_only:
+    if not args.backgrounds_only and not args.crop_only:
         convert_directory(args.directory)
 
-    if not args.keep_background:
+    if not args.keep_background and not args.crop_only:
         remove_backgrounds(args.directory)
+
+    if not args.keep_background and not args.backgrounds_only:
+        crop_objects(args.directory)
 
 
 if __name__ == "__main__":

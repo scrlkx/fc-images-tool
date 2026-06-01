@@ -1,10 +1,10 @@
 # fc-images
 
-Batch-converts WebP, AVIF, and JPEG images to PNG, then removes backgrounds using the [birefnet-general](https://github.com/ZhengPeng7/BiRefNet) AI model.
+Batch-converts WebP, AVIF, and JPEG images to PNG, removes backgrounds using the [birefnet-general](https://github.com/ZhengPeng7/BiRefNet) AI model, and crops the transparent padding around each object.
 
 Installs as:
 - **`fc-images`** — CLI command available system-wide
-- **Nautilus right-click menu** — three actions on any directory (if Nautilus is installed)
+- **Nautilus right-click menu** — four actions on any directory (if Nautilus is installed)
 
 ## Install
 
@@ -23,7 +23,7 @@ Installed automatically if Nautilus and `nautilus-python` are present. If `nauti
 ## Usage
 
 ```bash
-# Convert formats + remove backgrounds (full pipeline)
+# Full pipeline: convert formats + remove backgrounds + crop objects
 fc-images /path/to/directory
 
 # Convert formats only (WebP/AVIF/JPEG → PNG, keep backgrounds)
@@ -31,9 +31,14 @@ fc-images /path/to/directory --keep-background
 
 # Remove backgrounds only (operates on existing PNGs)
 fc-images /path/to/directory --backgrounds-only
+
+# Crop only: trim transparent padding from existing PNGs
+fc-images /path/to/directory --crop-only
 ```
 
-Original files are deleted after conversion. Background removal overwrites PNGs in place.
+Original files are deleted after conversion. Background removal and cropping overwrite PNGs in place.
+
+The crop step detects the bounding box of non-transparent pixels and removes the surrounding empty area. It only processes RGBA PNGs and skips images with no transparency.
 
 ## Update
 
