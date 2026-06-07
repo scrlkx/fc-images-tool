@@ -65,7 +65,7 @@ def remove_backgrounds(directory: Path) -> None:
         print("No PNG files found for background removal.")
         return
 
-    session = new_session("birefnet-general")
+    session = new_session("birefnet-general-lite")
     for png in pngs:
         try:
             remove_background(png, session)
