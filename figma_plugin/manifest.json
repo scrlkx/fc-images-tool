@@ -1,8 +1,14 @@
 {
   "name": "FC Images Sales",
-  "id": "fc-images-sales",
+  "id": "1647753101872661536",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
-  "editorType": ["figma"]
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { 
+    "allowedDomains": [
+      "none"
+    ]
+  }
 }

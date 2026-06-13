@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Reads a promotional CSV and outputs a JSON payload for the Figma plugin.
+Reads a sales CSV and outputs a JSON payload for the Figma plugin.
 
 CSV format (no header, semicolon-separated):
   image_filename;product_name;previous_price;new_price
 
 Usage:
-  python generate_figma_metadata.py promocoes/promocoes.csv --data 2026-06-14
+  python generate_figma_metadata.py sales/sales.csv --data 2026-06-14
 """
 
 import argparse
@@ -19,9 +19,18 @@ from datetime import date, timedelta
 from pathlib import Path
 
 MONTHS_PT_NAME = {
-    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Março",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro",
 }
 
 
@@ -54,9 +63,16 @@ def encode_image(path: Path) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Gera metadata JSON para o plugin Figma de promoções.")
+    parser = argparse.ArgumentParser(
+        description="Gera metadata JSON para o plugin Figma de promoções."
+    )
     parser.add_argument("csv", help="Caminho para o arquivo CSV")
-    parser.add_argument("--data", required=True, metavar="DATA", help="Data alvo no formato ISO (ex: 2026-06-14)")
+    parser.add_argument(
+        "--data",
+        required=True,
+        metavar="DATA",
+        help="Data alvo no formato ISO (ex: 2026-06-14)",
+    )
     args = parser.parse_args()
 
     csv_path = Path(args.csv).resolve()
@@ -77,12 +93,14 @@ def main():
             img_path = base_dir / img_file
             if not img_path.exists():
                 sys.exit(f"Imagem não encontrada: {img_path}")
-            products.append({
-                "name": name,
-                "prev_price": prev_price,
-                "new_price": new_price,
-                "image_b64": encode_image(img_path),
-            })
+            products.append(
+                {
+                    "name": name,
+                    "prev_price": prev_price,
+                    "new_price": new_price,
+                    "image_b64": encode_image(img_path),
+                }
+            )
 
     payload = {
         "frame_name": frame_name(target),
@@ -91,7 +109,9 @@ def main():
     }
 
     output_path = csv_path.with_suffix(".json")
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     print(f"✓ {len(products)} produto(s) exportado(s) → {output_path}")
     print(f"  Frame: \"{payload['frame_name']}\"")

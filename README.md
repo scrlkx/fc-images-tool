@@ -1,10 +1,11 @@
 # fc-images
 
-Batch-converts WebP, AVIF, and JPEG images to PNG, removes backgrounds using the [birefnet-general](https://github.com/ZhengPeng7/BiRefNet) AI model, and crops the transparent padding around each object.
+Batch-converts WebP, AVIF, and JPEG images to PNG, removes backgrounds using the [birefnet-general-lite](https://github.com/ZhengPeng7/BiRefNet) AI model, and crops the transparent padding around each object.
 
 Installs as:
+
 - **`fc-images`** — CLI command available system-wide
-- **Nautilus right-click menu** — four actions on any directory (if Nautilus is installed)
+- **Nautilus right-click menu** — four actions on any directory, plus sales metadata generation on CSV files (if Nautilus is installed)
 
 ## Install
 
@@ -39,6 +40,30 @@ fc-images /path/to/directory --crop-only
 Original files are deleted after conversion. Background removal and cropping overwrite PNGs in place.
 
 The crop step detects the bounding box of non-transparent pixels and removes the surrounding empty area. It only processes RGBA PNGs and skips images with no transparency.
+
+## Figma Sales Plugin
+
+Weekly sales slides can be generated directly in Figma using the plugin in `figma_plugin/`.
+
+### Workflow
+
+1. Prepare a semicolon-delimited CSV with one product per line:
+
+   ```
+   image_filename;product_name;previous_price;new_price
+   ```
+
+   Images must live in the same directory as the CSV.
+
+2. Generate the metadata JSON (right-click the CSV in Nautilus → **Generate Sales Metadata**, then pick the sales date from the calendar — or run it directly):
+
+   ```bash
+   python generate_figma_metadata.py /path/to/sales.csv --data 2026-06-14
+   ```
+
+   This produces a `sales.json` alongside the CSV containing product names, prices, base64-encoded images, the frame name, and the validity period in Portuguese.
+
+3. Open Figma, load the plugin (`figma_plugin/`), select the target page and the generated JSON, and click **Generate Slides**. The plugin duplicates the Slide 1 / Slide 2 templates and fills in each product.
 
 ## Update
 
