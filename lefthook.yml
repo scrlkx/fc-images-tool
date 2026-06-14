@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: false
+  commands:
+    ruff-lint:
+      glob: "*.py"
+      run: .venv/bin/ruff check {staged_files}
+
+    ruff-format:
+      glob: "*.py"
+      run: .venv/bin/ruff format --check {staged_files}
+
+    pyright:
+      run: .venv/bin/pyright

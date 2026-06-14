@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
+
 # Wraps everything in main() so a partial curl download doesn't execute anything.
 set -euo pipefail
 
-REPO_URL="https://github.com/scrlkx/fc-images"
-INSTALL_DIR="${HOME}/.local/share/fc-images"
-BIN_DIR="${HOME}/.local/bin"
-WRAPPER="${BIN_DIR}/fc-images"
-EXT_DIR="${HOME}/.local/share/nautilus-python/extensions"
-EXT_LINK="${EXT_DIR}/fc_images_nautilus.py"
+REPO_URL="https://github.com/scrlkx/fc-images-tool"
+INSTALL_DIR="${HOME}/.local/share/fc-images-tool"
+DESKTOP_DIR="${HOME}/.local/share/applications"
+DESKTOP_FILE="${DESKTOP_DIR}/fc-images-tool.desktop"
 
 main() {
     if [[ "${1:-}" == "--uninstall" ]]; then
@@ -15,15 +14,13 @@ main() {
         return
     fi
 
-    echo "==> fc-images installer"
+    echo "==> fc-images-tool installer"
     echo ""
 
     check_prerequisites
     clone_or_update
     setup_venv
-    install_wrapper
-    install_nautilus_extension
-    check_path
+    install_desktop_shortcut
     print_summary
 }
 
@@ -108,66 +105,10 @@ setup_venv() {
     fi
 }
 
-# ── fc-images wrapper ────────────────────────────────────────────────────────
+# ── Desktop shortcut ─────────────────────────────────────────────────────────
 
-install_wrapper() {
-    mkdir -p "$BIN_DIR"
-    cat > "$WRAPPER" <<EOF
-#!/usr/bin/env bash
-exec "${INSTALL_DIR}/.venv/bin/python" \\
-     "${INSTALL_DIR}/convert_images.py" \\
-     "\$@"
-EOF
-    chmod +x "$WRAPPER"
-    echo "==> Installed: fc-images -> ${WRAPPER}"
-}
-
-# ── Nautilus extension ───────────────────────────────────────────────────────
-
-install_nautilus_extension() {
-    if ! command -v nautilus &>/dev/null; then
-        echo "==> Nautilus not found — skipping file manager extension."
-        echo "    (fc-images CLI is still available)"
-        return
-    fi
-
-    if ! "$PYTHON3" -c "import gi; gi.require_version('Nautilus', '4.1')" 2>/dev/null; then
-        echo ""
-        echo "WARNING: nautilus-python is not installed."
-        echo "  The right-click extension requires it. Install with:"
-        if command -v dnf &>/dev/null; then
-            echo "    sudo dnf install nautilus-python"
-        elif command -v apt-get &>/dev/null; then
-            echo "    sudo apt install python3-nautilus"
-        elif command -v pacman &>/dev/null; then
-            echo "    sudo pacman -S python-nautilus"
-        else
-            echo "    (install the nautilus-python package for your distro)"
-        fi
-        echo "  Then re-run this installer."
-        return
-    fi
-
-    mkdir -p "$EXT_DIR"
-    ln -sf "${INSTALL_DIR}/nautilus_extension.py" "$EXT_LINK"
-    echo "==> Installed Nautilus extension: ${EXT_LINK}"
-
-    if pgrep -x nautilus &>/dev/null; then
-        nautilus -q 2>/dev/null || true
-        echo "==> Nautilus restarted."
-    fi
-}
-
-# ── PATH check ───────────────────────────────────────────────────────────────
-
-check_path() {
-    if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
-        echo ""
-        echo "WARNING: ${BIN_DIR} is not on your PATH."
-        echo "  Add this to your ~/.bashrc or ~/.zshrc:"
-        echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
-        echo "  Then restart your shell or run: source ~/.bashrc"
-    fi
+install_desktop_shortcut() {
+    bash "${INSTALL_DIR}/create-desktop-shortcut.sh" "$INSTALL_DIR"
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────
@@ -176,21 +117,19 @@ print_summary() {
     echo ""
     echo "Done!"
     echo ""
-    echo "  fc-images <directory>               — convert formats + remove backgrounds"
-    echo "  fc-images <directory> --keep-background  — convert formats only"
-    echo "  fc-images <directory> --backgrounds-only — remove backgrounds only"
+    echo "  Open the 'FC Images Tool' shortcut from the GNOME launcher."
+    echo "  Or run directly: ${INSTALL_DIR}/run-app.sh"
     echo ""
-    echo "NOTE: The first run will download the birefnet-general AI model (~1 GB)."
+    echo "NOTE: The first run will download the birefnet-general-lite AI model (~1 GB)."
     echo "      This is a one-time download cached in ~/.u2net/."
 }
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
 
 do_uninstall() {
-    echo "==> Uninstalling fc-images..."
+    echo "==> Uninstalling fc-images-tool..."
 
-    [[ -f "$WRAPPER" ]] && rm -f "$WRAPPER" && echo "  Removed: ${WRAPPER}"
-    [[ -L "$EXT_LINK" ]] && rm -f "$EXT_LINK" && echo "  Removed: ${EXT_LINK}"
+    [[ -f "$DESKTOP_FILE" ]] && rm -f "$DESKTOP_FILE" && echo "  Removed: ${DESKTOP_FILE}"
 
     if [[ -d "$INSTALL_DIR" ]]; then
         rm -rf "$INSTALL_DIR"

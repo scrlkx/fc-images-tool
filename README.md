@@ -1,45 +1,30 @@
-# fc-images
+# fc-images-tool
 
-Batch-converts WebP, AVIF, and JPEG images to PNG, removes backgrounds using the [birefnet-general-lite](https://github.com/ZhengPeng7/BiRefNet) AI model, and crops the transparent padding around each object.
+Streamlit webapp for product image processing: converts formats, removes backgrounds with AI, crops objects, builds horizontal product sets, and exports metadata for the Figma plugin.
 
-Installs as:
+**Tabs:**
 
-- **`fc-images`** — CLI command available system-wide
-- **Nautilus right-click menu** — four actions on any directory, plus sales metadata generation on CSV files (if Nautilus is installed)
+| Tab | Function |
+|-----|----------|
+| Convert Images Format | WebP, AVIF, JPEG → PNG (RGBA) |
+| Remove Background | Removes backgrounds using the BiRefNet model via `rembg` |
+| Crop Images | Trims transparent padding around objects |
+| Draw Product Set | Aligns 2–6 images side by side as a set |
+| Generate Figma Schema | Generates the JSON for the sales slides Figma plugin |
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/scrlkx/fc-images/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/scrlkx/fc-images-tool/main/install.sh | bash
 ```
 
-Requirements: Linux, Python 3.10+, git.
+Requirements: Python 3.10+ and git.
 
-> **First run** downloads the birefnet-general model (~1 GB) to `~/.u2net/`. One-time only.
-
-### Nautilus extension
-
-Installed automatically if Nautilus and `nautilus-python` are present. If `nautilus-python` is missing, the installer prints the install command for your distro and asks you to re-run.
+> **First run** downloads the birefnet-general-lite model (~1 GB) to `~/.u2net/`. One-time only.
 
 ## Usage
 
-```bash
-# Full pipeline: convert formats + remove backgrounds + crop objects
-fc-images /path/to/directory
-
-# Convert formats only (WebP/AVIF/JPEG → PNG, keep backgrounds)
-fc-images /path/to/directory --keep-background
-
-# Remove backgrounds only (operates on existing PNGs)
-fc-images /path/to/directory --backgrounds-only
-
-# Crop only: trim transparent padding from existing PNGs
-fc-images /path/to/directory --crop-only
-```
-
-Original files are deleted after conversion. Background removal and cropping overwrite PNGs in place.
-
-The crop step detects the bounding box of non-transparent pixels and removes the surrounding empty area. It only processes RGBA PNGs and skips images with no transparency.
+Open the **FC Images Tool** shortcut from the launcher.
 
 ## Figma Sales Plugin
 
@@ -47,41 +32,25 @@ Weekly sales slides can be generated directly in Figma using the plugin in `figm
 
 ### Workflow
 
-1. Prepare a semicolon-delimited CSV with one product per line:
+1. Open the webapp and go to the **Generate Figma Schema** tab.
 
-   ```
-   image_filename;product_name;previous_price;new_price
-   ```
-
-   Images must live in the same directory as the CSV.
-
-2. Generate the metadata JSON (right-click the CSV in Nautilus → **Generate Sales Metadata**, then pick the sales date from the calendar — or run it directly):
-
-   ```bash
-   python generate_figma_metadata.py /path/to/sales.csv --data 2026-06-14
-   ```
-
-   This produces a `sales.json` alongside the CSV containing product names, prices, base64-encoded images, the frame name, and the validity period in Portuguese.
+2. Fill in the sales date, then add products one by one (name, prices, cover image). Download the generated `sales.json`.
 
 3. Open Figma, load the plugin (`figma_plugin/`), select the target page and the generated JSON, and click **Generate Slides**. The plugin duplicates the Slide 1 / Slide 2 templates and fills in each product.
-
-## Update
-
-Re-run the install command. Dependencies are only reinstalled if `requirements.txt` changed.
 
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/scrlkx/fc-images/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/scrlkx/fc-images-tool/main/install.sh | bash -s -- --uninstall
 ```
 
-This removes `~/.local/bin/fc-images`, the Nautilus extension, and `~/.local/share/fc-images/`. The model cache at `~/.u2net/` is left in place — delete it manually if you no longer need it.
+This removes the desktop shortcut and `~/.local/share/fc-images-tool/`. The model cache at `~/.u2net/` is left in place — delete it manually if you no longer need it.
 
 ## Development
 
 ```bash
-git clone https://github.com/scrlkx/fc-images
-cd fc-images
+git clone git@github.com:scrlkx/fc-images-tool.git
+cd fc-images-tool
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-make install-extension && make restart-nautilus
+make run-ui
 ```
