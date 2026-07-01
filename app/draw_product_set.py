@@ -52,27 +52,43 @@ def _build_set_bytes(file_bytes: list[bytes], gap: int) -> bytes:
 
 
 def render():
+    if "draw_uploader_key" not in st.session_state:
+        st.session_state.draw_uploader_key = 0
+
     uploaded = st.file_uploader(
         "Images",
         type=["png"],
         accept_multiple_files=True,
+        key=f"draw_set_{st.session_state.draw_uploader_key}",
     )
 
-    if uploaded and not (2 <= len(uploaded) <= 6):
-        st.error("Please select between 2 and 6 PNG images.")
-        return
+    if "draw_set_result" in st.session_state:
+        st.image(st.session_state.draw_set_result, caption="Preview")
 
-    if uploaded and 2 <= len(uploaded) <= 6:
-        files_bytes = [file.getvalue() for file in uploaded]
-        auto_gap = _compute_auto_gap(files_bytes)
-        gap = st.number_input("Gap (px)", min_value=0, value=auto_gap, step=1)
-
-        set_bytes = _build_set_bytes(files_bytes, int(gap))
-        st.image(set_bytes, caption="Preview")
+        def _clear():
+            del st.session_state.draw_set_result
+            st.session_state.draw_uploader_key += 1
 
         st.download_button(
-            label="Download set",
-            data=set_bytes,
+            label="Download",
+            data=st.session_state.draw_set_result,
             file_name=f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png",
             mime="image/png",
+            on_click=_clear,
         )
+    else:
+        if uploaded and not (2 <= len(uploaded) <= 6):
+            st.error("Please select between 2 and 6 PNG images.")
+            return
+
+        if uploaded and 2 <= len(uploaded) <= 6:
+            files_bytes = [file.getvalue() for file in uploaded]
+            auto_gap = _compute_auto_gap(files_bytes)
+            gap = st.number_input("Gap (px)", min_value=0, value=auto_gap, step=1)
+
+            if st.button("Draw"):
+                with st.spinner("Building set..."):
+                    result = _build_set_bytes(files_bytes, int(gap))
+
+                st.session_state.draw_set_result = result
+                st.rerun()

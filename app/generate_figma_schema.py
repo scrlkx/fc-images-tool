@@ -23,7 +23,7 @@ MONTHS_PT_NAME = {
 
 
 def _validity_text(target: date) -> str:
-    end = target + timedelta(days=7)
+    end = target + timedelta(days=6)
 
     return (
         f"Ofertas válidas de {target.strftime('%d/%m')} até "
@@ -52,6 +52,98 @@ def render():
     if "success_message" in st.session_state:
         st.success(st.session_state.success_message)
         del st.session_state.success_message
+
+    st.date_input(
+        "Date",
+        min_value=date.today() + timedelta(days=1),
+        key="campaign_date",
+    )
+
+    with st.form(
+        f"product_form_{st.session_state.uploader_key}", clear_on_submit=False
+    ):
+        uploaded_image = st.file_uploader(
+            "Cover image",
+            type=["png"],
+            accept_multiple_files=False,
+            key=f"cover_image_{st.session_state.uploader_key}",
+        )
+
+        title = st.text_input(
+            "Title",
+            placeholder="Body Splash Hidrabene Derma",
+            key="title",
+        )
+
+        current_price = st.text_input(
+            "Current price",
+            placeholder="45,90",
+            key="current_price",
+        )
+
+        new_price = st.text_input(
+            "New price",
+            placeholder="39,50",
+            key="new_price",
+        )
+
+        submitted = st.form_submit_button("Add")
+
+    if submitted:
+        errors = []
+
+        if uploaded_image is None:
+            errors.append("Cover image is required.")
+
+        title_len = len(title.strip())
+        if title_len < 20 or title_len > 46:
+            errors.append("Title must be between 20 and 46 characters.")
+
+        if not current_price.strip():
+            errors.append("Current price is required.")
+
+        if not new_price.strip():
+            errors.append("New price is required.")
+
+        price_pattern = r"^\d+,\d{2}$"
+
+        if current_price and not re.match(price_pattern, current_price):
+            errors.append("Current price must be in the format XXX,XX.")
+
+        if new_price and not re.match(price_pattern, new_price):
+            errors.append("New price must be in the format XXX,XX.")
+
+        if (
+            current_price
+            and new_price
+            and re.match(price_pattern, current_price)
+            and re.match(price_pattern, new_price)
+        ):
+            if float(new_price.replace(",", ".")) >= float(
+                current_price.replace(",", ".")
+            ):
+                errors.append("New price must be less than Current price.")
+
+        if errors:
+            for error in errors:
+                st.error(error)
+        else:
+            assert uploaded_image is not None
+
+            st.session_state.products.loc[len(st.session_state.products)] = {
+                "Cover image": uploaded_image.name,
+                "Title": title,
+                "Current price": current_price,
+                "New price": new_price,
+                "image_b64": (
+                    "data:image/png;base64,"
+                    + base64.b64encode(uploaded_image.getvalue()).decode()
+                ),
+            }
+
+            st.session_state.success_message = "Product added to the set!"
+            st.session_state.uploader_key += 1
+            st.rerun()
 
     if not st.session_state.products.empty:
         edited_df = st.data_editor(
@@ -85,90 +177,10 @@ def render():
             st.rerun()
     else:
         st.dataframe(
-            st.session_state.products,
+            st.session_state.products.drop(columns=["image_b64"]),
             hide_index=True,
             width="stretch",
         )
-
-    with st.form("product_form", clear_on_submit=True):
-        uploaded_image = st.file_uploader(
-            "Cover image",
-            type=["png"],
-            accept_multiple_files=False,
-            key=f"cover_image_{st.session_state.uploader_key}",
-        )
-
-        title = st.text_input(
-            "Title",
-            placeholder="Body Splash Hidrabene Derma",
-            key="title",
-        )
-
-        current_price = st.text_input(
-            "Current price",
-            placeholder="45,90",
-            key="current_price",
-        )
-
-        new_price = st.text_input(
-            "New price",
-            placeholder="39,50",
-            key="new_price",
-        )
-
-        submitted = st.form_submit_button("Add to set")
-
-    if submitted:
-        errors = []
-
-        if uploaded_image is None:
-            errors.append("Cover image is required.")
-
-        if not title.strip():
-            errors.append("Title is required.")
-
-        if not current_price.strip():
-            errors.append("Current price is required.")
-
-        if not new_price.strip():
-            errors.append("New price is required.")
-
-        price_pattern = r"^\d+,\d{2}$"
-
-        if current_price and not re.match(price_pattern, current_price):
-            errors.append("Current price must be in the format XXX,XX.")
-
-        if new_price and not re.match(price_pattern, new_price):
-            errors.append("New price must be in the format XXX,XX.")
-
-        if errors:
-            for error in errors:
-                st.error(error)
-        else:
-            assert uploaded_image is not None
-
-            st.session_state.products.loc[len(st.session_state.products)] = {
-                "Cover image": uploaded_image.name,
-                "Title": title,
-                "Current price": current_price,
-                "New price": new_price,
-                "image_b64": (
-                    "data:image/png;base64,"
-                    + base64.b64encode(uploaded_image.getvalue()).decode()
-                ),
-            }
-
-            st.session_state.success_message = "Product added to the set!"
-            st.session_state.uploader_key += 1
-            st.rerun()
-
-    st.divider()
-
-    st.date_input(
-        "Date",
-        min_value=date.today() + timedelta(days=1),
-        key="campaign_date",
-    )
 
     result = {
         "frame_name": f"{st.session_state.campaign_date.day} de {MONTHS_PT_NAME[st.session_state.campaign_date.month]}",  # noqa: E501
@@ -186,9 +198,27 @@ def render():
 
     st.divider()
 
-    st.download_button(
-        label="Download schema",
-        data=json.dumps(result, indent=2, ensure_ascii=False),
-        file_name=f"sales-{st.session_state.campaign_date.strftime('%Y-%m-%d')}.json",
-        mime="application/json",
-    )
+    left_col, _, right_col = st.columns([4, 4, 1])
+
+    with left_col:
+        st.download_button(
+            label="Download",
+            data=json.dumps(result, indent=2, ensure_ascii=False),
+            file_name=f"sales-{st.session_state.campaign_date.strftime('%Y-%m-%d')}.json",
+            mime="application/json",
+        )
+
+    with right_col:
+        if st.button("Reset"):
+            st.session_state.products = pd.DataFrame(
+                columns=[
+                    "Cover image",
+                    "Title",
+                    "Current price",
+                    "New price",
+                    "image_b64",
+                ]
+            )
+            del st.session_state.campaign_date
+            st.session_state.uploader_key += 1
+            st.rerun()

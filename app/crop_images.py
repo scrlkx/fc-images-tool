@@ -7,58 +7,64 @@ from PIL import Image
 
 
 def render():
+    if "crop_uploader_key" not in st.session_state:
+        st.session_state.crop_uploader_key = 0
+
     uploaded = st.file_uploader(
-        "Images", type=["png"], accept_multiple_files=True, key="crop_images"
+        "Images",
+        type=["png"],
+        accept_multiple_files=True,
+        key=f"crop_images_{st.session_state.crop_uploader_key}",
     )
 
-    if uploaded and not (2 <= len(uploaded)):
-        st.error("Please select more them 1 PNG images.")
-        return
+    if "crop_results" in st.session_state:
+        result = st.session_state.crop_results
 
-    files_bytes = [file.getvalue() for file in uploaded]
-    images = [Image.open(io.BytesIO(bytes)).convert("RGBA") for bytes in files_bytes]
+        def _clear():
+            del st.session_state.crop_results
+            st.session_state.crop_uploader_key += 1
 
-    result = []
+        if len(result) == 1:
+            st.download_button(
+                label="Download",
+                data=result[0],
+                file_name=f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png",
+                mime="image/png",
+                on_click=_clear,
+            )
+        else:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zf:
+                for index, data in enumerate(result):
+                    zf.writestr(f"{index + 1}.png", data)
 
-    for image in images:
-        bbox = image.getbbox()
-
-        if bbox is None or bbox == (0, 0, image.width, image.height):
-            continue
-
-        result.append(image.crop(bbox))
-
-    if not result:
-        return
-
-    target_file = None
-
-    if len(result) == 1:
-        target_file = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png"
-
-        image_buffer = io.BytesIO()
-        result[0].save(image_buffer, format="PNG")
-
-        st.download_button(
-            label="Download cropped image",
-            data=image_buffer.getvalue(),
-            file_name=target_file,
-            mime="image/png",
-        )
+            st.download_button(
+                label="Download",
+                data=zip_buffer.getvalue(),
+                file_name=f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.zip",
+                mime="application/zip",
+                on_click=_clear,
+            )
     else:
-        target_file = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.zip"
+        if not uploaded:
+            st.error("Please select at least 1 PNG image.")
 
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zip:
-            for index, image in enumerate(result):
-                image_buffer = io.BytesIO()
-                image.save(image_buffer, format="PNG")
+        if uploaded and st.button("Crop"):
+            with st.spinner("Cropping..."):
+                result = []
+                for file in uploaded:
+                    image = Image.open(io.BytesIO(file.getvalue())).convert("RGBA")
+                    bbox = image.getbbox()
 
-                zip.writestr(f"{index + 1}.png", image_buffer.getvalue())
+                    if bbox is None or bbox == (0, 0, image.width, image.height):
+                        continue
 
-        st.download_button(
-            label="Download cropped images",
-            data=zip_buffer.getvalue(),
-            file_name=target_file,
-            mime="application/zip",
-        )
+                    buf = io.BytesIO()
+                    image.crop(bbox).save(buf, format="PNG")
+                    result.append(buf.getvalue())
+
+            if result:
+                st.session_state.crop_results = result
+                st.rerun()
+            else:
+                st.warning("No images needed cropping.")

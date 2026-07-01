@@ -1,4 +1,4 @@
-figma.showUI(__html__, { width: 400, height: 270 });
+figma.showUI(__html__, { width: 400, height: 370 });
 
 figma.ui.postMessage({
   type: "pages",
@@ -94,6 +94,18 @@ async function updateSlide2(slide2Clone, product) {
 }
 
 figma.ui.onmessage = async (msg) => {
+  if (msg.type === "get_frames") {
+    const page = figma.root.children.find((p) => p.name === msg.page_name);
+    if (!page) { figma.ui.postMessage({ type: "frames", frames: [] }); return; }
+    await page.loadAsync();
+    const containerName = msg.mode === "instagram" ? "Instagram" : "Flyers";
+    const container = page.children.find((c) => c.name === containerName);
+    if (!container) { figma.ui.postMessage({ type: "frames", frames: [] }); return; }
+    const frames = container.children.filter((c) => c.type === "FRAME").map((c) => c.name);
+    figma.ui.postMessage({ type: "frames", frames });
+    return;
+  }
+
   if (msg.type !== "generate") return;
 
   const payload = msg.payload;
@@ -104,10 +116,16 @@ figma.ui.onmessage = async (msg) => {
     progress(`Searching for page "${pageName}"…`);
     const page = figma.root.children.find((p) => p.name === pageName);
     if (!page) throw new Error(`Page "${pageName}" not found.`);
+    await page.loadAsync();
 
-    // 2. Get template frame (first frame child of the page)
-    const templateFrame = page.children.find((c) => c.type === "FRAME");
-    if (!templateFrame) throw new Error("No template frame found on the page.");
+    // 2. Find container (Instagram or Flyers)
+    const containerName = msg.mode === "instagram" ? "Instagram" : "Flyers";
+    const container = page.children.find((c) => c.name === containerName);
+    if (!container) throw new Error(`Container "${containerName}" not found on page.`);
+
+    // 3. Get template frame selected by the user (inside the container)
+    const templateFrame = container.children.find((c) => c.type === "FRAME" && c.name === msg.frame_name);
+    if (!templateFrame) throw new Error(`Frame "${msg.frame_name}" not found in "${containerName}".`);
 
     const slide1Template = templateFrame.children.find((c) => c.name === "Slide 1");
     if (!slide1Template) throw new Error('Slide 1 not found in the template frame.');
@@ -115,15 +133,15 @@ figma.ui.onmessage = async (msg) => {
     const slide2Template = templateFrame.children.find((c) => c.name === "Slide 2");
     if (!slide2Template) throw new Error('Slide 2 not found in the template frame.');
 
-    // 3. Load fonts
+    // 4. Load fonts
     progress("Loading fonts…");
     await Promise.all([
       figma.loadFontAsync({ family: "DM Sans", style: "Regular" }),
       figma.loadFontAsync({ family: "DM Sans", style: "Black" }),
     ]);
 
-    // 4. Switch to target page and create parent frame
-    figma.currentPage = page;
+    // 5. Switch to target page and create parent frame inside the container
+    await figma.setCurrentPageAsync(page);
 
     const parentFrame = figma.createFrame();
     parentFrame.name = payload.frame_name;
@@ -133,41 +151,51 @@ figma.ui.onmessage = async (msg) => {
     );
     parentFrame.fills = [];
     parentFrame.clipsContent = false;
+    container.appendChild(parentFrame);
 
-    // Position below the last existing frame on the page
-    const existingFrames = page.children.filter((c) => c.type === "FRAME" && c !== parentFrame);
+    if (msg.mode === "flyer") {
+      parentFrame.layoutMode = "HORIZONTAL";
+      parentFrame.itemSpacing = GAP;
+      parentFrame.primaryAxisSizingMode = "AUTO";
+      parentFrame.counterAxisSizingMode = "AUTO";
+    }
+
+    // Position below the last existing frame inside the container
+    const existingFrames = container.children.filter((c) => c.type === "FRAME" && c !== parentFrame);
     if (existingFrames.length > 0) {
       const last = existingFrames[existingFrames.length - 1];
       parentFrame.x = last.x;
-      parentFrame.y = last.y + last.height + 200;
+      parentFrame.y = last.y + last.height + 2000;
     }
 
-    // 5. Clone Slide 1 → update validity text
-    progress("Creating Slide 1…");
-    const slide1Clone = slide1Template.clone();
-    parentFrame.appendChild(slide1Clone);
-    slide1Clone.x = 0;
-    slide1Clone.y = 0;
+    // 6. Clone Slide 1 → update validity text (Instagram only — Flyer has no cover slide)
+    if (msg.mode !== "flyer") {
+      progress("Creating Slide 1…");
+      const slide1Clone = slide1Template.clone();
+      parentFrame.appendChild(slide1Clone);
+      slide1Clone.x = 0;
+      slide1Clone.y = 0;
 
-    const rules1 = findByName(slide1Clone, "Rules 1");
-    if (rules1 && rules1.type === "TEXT") {
-      rules1.characters = payload.validity_text;
+      const rules1 = findByName(slide1Clone, "Rules 1");
+      if (rules1 && rules1.type === "TEXT") {
+        rules1.characters = payload.validity_text;
+      }
     }
 
-    // 6. Clone Slide 2 for each product
+    // 7. Clone Slide 2 for each product
     for (let i = 0; i < payload.products.length; i++) {
       const product = payload.products[i];
       progress(`Creating slide ${i + 1}/${payload.products.length}: ${product.name}…`);
 
       const slide2Clone = slide2Template.clone();
       parentFrame.appendChild(slide2Clone);
-      slide2Clone.x = (i + 1) * (SLIDE_W + GAP);
+      slide2Clone.x = msg.mode === "flyer" ? i * (SLIDE_W + GAP) : (i + 1) * (SLIDE_W + GAP);
       slide2Clone.y = 0;
 
       await updateSlide2(slide2Clone, product);
     }
 
-    // 7. Scroll to new frame
+    // 8. Scroll to new frame
     figma.viewport.scrollAndZoomIntoView([parentFrame]);
 
     figma.ui.postMessage({
