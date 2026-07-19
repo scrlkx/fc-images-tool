@@ -1,9 +1,4 @@
-figma.showUI(__html__, { width: 400, height: 370 });
-
-figma.ui.postMessage({
-  type: "pages",
-  pages: figma.root.children.map((p) => p.name),
-});
+figma.showUI(__html__, { width: 400, height: 500 });
 
 const SLIDE_W = 1080;
 const SLIDE_H = 1440;
@@ -25,7 +20,11 @@ function findByName(node, name) {
 }
 
 function findImageNode(node) {
-  if ("fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE")) {
+  if (
+    "fills" in node &&
+    Array.isArray(node.fills) &&
+    node.fills.some((f) => f.type === "IMAGE")
+  ) {
     return node;
   }
   if ("children" in node) {
@@ -53,10 +52,108 @@ function replaceProductImage(coverNode, dataUrl) {
   const imageNode = findImageNode(coverNode);
   if (!imageNode) return;
   const fills = imageNode.fills.map((f) => {
-    if (f.type === "IMAGE") return Object.assign({}, f, { imageHash: image.hash, scaleMode: "FIT" });
+    if (f.type === "IMAGE")
+      return Object.assign({}, f, { imageHash: image.hash, scaleMode: "FIT" });
     return f;
   });
   imageNode.fills = fills;
+}
+
+function copyImageFill(sourceCoverNode, destCoverNode) {
+  const sourceImageNode = findImageNode(sourceCoverNode);
+  const destImageNode = findImageNode(destCoverNode);
+  if (!sourceImageNode || !destImageNode) return;
+  destImageNode.fills = sourceImageNode.fills;
+}
+
+async function loadFontsForTextNode(node) {
+  if (!node.characters.length) return;
+  const fonts = new Set(
+    node
+      .getStyledTextSegments(["fontName"])
+      .map((s) => JSON.stringify(s.fontName)),
+  );
+  await Promise.all([...fonts].map((f) => figma.loadFontAsync(JSON.parse(f))));
+}
+
+// Copies only the text value, not styling — the destination keeps whatever
+// style is already defined on it (e.g. the Flyer component's own strikethrough).
+async function copyTextValue(sourceNode, destNode) {
+  if (
+    !sourceNode ||
+    !destNode ||
+    sourceNode.type !== "TEXT" ||
+    destNode.type !== "TEXT"
+  )
+    return;
+  await loadFontsForTextNode(destNode);
+  destNode.characters = sourceNode.characters;
+}
+
+// Copies live Cover/Details/Price values from an already-generated Instagram
+// slide into a Flyer instance, preserving manual edits made directly in Figma.
+async function copyProductVisuals(sourceSlide, destSlide) {
+  const sourceCover = findByName(sourceSlide, "Cover");
+  const destCover = findByName(destSlide, "Cover");
+  if (sourceCover && destCover) copyImageFill(sourceCover, destCover);
+
+  const sourceDetails = findByName(sourceSlide, "Details");
+  const destDetails = findByName(destSlide, "Details");
+  if (
+    sourceDetails &&
+    destDetails &&
+    sourceDetails.children.length > 0 &&
+    destDetails.children.length > 0
+  ) {
+    await copyTextValue(sourceDetails.children[0], destDetails.children[0]);
+  }
+
+  const sourcePrice = findByName(sourceSlide, "Price");
+  const destPrice = findByName(destSlide, "Price");
+  if (
+    sourcePrice &&
+    destPrice &&
+    sourcePrice.children.length >= 2 &&
+    destPrice.children.length >= 2
+  ) {
+    await copyTextValue(sourcePrice.children[0], destPrice.children[0]);
+    await copyTextValue(sourcePrice.children[1], destPrice.children[1]);
+  }
+}
+
+function formatShortDate(dateStr) {
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}`;
+}
+
+const MONTHS_PT = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+function formatFrameName(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return `${d} de ${MONTHS_PT[m - 1]}`;
+}
+
+function substituteDateToken(instance, dateStr) {
+  const rules1 = findByName(instance, "Rules 1");
+  if (rules1 && rules1.type === "TEXT") {
+    rules1.characters = rules1.characters.replace(
+      "%date%",
+      formatShortDate(dateStr),
+    );
+  }
 }
 
 async function updateSlide2(slide2Clone, product) {
@@ -93,45 +190,124 @@ async function updateSlide2(slide2Clone, product) {
   }
 }
 
-figma.ui.onmessage = async (msg) => {
-  if (msg.type === "get_frames") {
-    const page = figma.root.children.find((p) => p.name === msg.page_name);
-    if (!page) { figma.ui.postMessage({ type: "frames", frames: [] }); return; }
-    await page.loadAsync();
-    const containerName = msg.mode === "instagram" ? "Instagram" : "Flyers";
-    const container = page.children.find((c) => c.name === containerName);
-    if (!container) { figma.ui.postMessage({ type: "frames", frames: [] }); return; }
-    const frames = container.children.filter((c) => c.type === "FRAME").map((c) => c.name);
-    figma.ui.postMessage({ type: "frames", frames });
-    return;
-  }
+function buildPageStatus() {
+  const page = figma.currentPage;
 
+  const findContainer = (name) => page.children.find((c) => c.name === name);
+  const componentsContainer = findContainer("Components");
+  const instagramContainer = findContainer("Instagram");
+  const flyersContainer = findContainer("Flyers");
+
+  const hasComponent = (name) =>
+    !!(
+      componentsContainer &&
+      componentsContainer.children.find(
+        (c) => c.type === "COMPONENT" && c.name === name,
+      )
+    );
+
+  const instagramFrames = instagramContainer
+    ? instagramContainer.children
+        .filter((c) => c.type === "FRAME")
+        .map((c) => c.name)
+    : [];
+
+  return {
+    type: "page_status",
+    pageName: page.name,
+    hasComponentsContainer: !!componentsContainer,
+    hasInstagramContainer: !!instagramContainer,
+    hasFlyersContainer: !!flyersContainer,
+    hasInstagramCover: hasComponent("Instagram Cover"),
+    hasInstagramSlide: hasComponent("Instagram Slide"),
+    hasFlyerComponent: hasComponent("Flyer"),
+    instagramFrames,
+  };
+}
+
+function sendPageStatus() {
+  figma.ui.postMessage(buildPageStatus());
+}
+
+sendPageStatus();
+figma.on("currentpagechange", sendPageStatus);
+
+figma.ui.onmessage = async (msg) => {
   if (msg.type !== "generate") return;
 
   const payload = msg.payload;
+  const isFlyer = msg.mode === "flyer";
 
   try {
-    // 1. Find target page
-    const pageName = msg.page_name;
-    progress(`Searching for page "${pageName}"…`);
-    const page = figma.root.children.find((p) => p.name === pageName);
-    if (!page) throw new Error(`Page "${pageName}" not found.`);
-    await page.loadAsync();
+    // 1. Always operate on the currently active page — dynamic-page access
+    // guarantees it is already loaded, so no loadAsync() is needed.
+    const page = figma.currentPage;
 
-    // 2. Find container (Instagram or Flyers)
-    const containerName = msg.mode === "instagram" ? "Instagram" : "Flyers";
-    const container = page.children.find((c) => c.name === containerName);
-    if (!container) throw new Error(`Container "${containerName}" not found on page.`);
+    // 2. Find containers — Flyer reads from "Instagram" and writes into "Flyers".
+    let sourceContainer, destContainer;
+    if (isFlyer) {
+      sourceContainer = page.children.find((c) => c.name === "Instagram");
+      if (!sourceContainer)
+        throw new Error('Container "Instagram" not found on page.');
+      destContainer = page.children.find((c) => c.name === "Flyers");
+      if (!destContainer)
+        throw new Error('Container "Flyers" not found on page.');
+    } else {
+      destContainer = page.children.find((c) => c.name === "Instagram");
+      if (!destContainer)
+        throw new Error('Container "Instagram" not found on page.');
+    }
 
-    // 3. Get template frame selected by the user (inside the container)
-    const templateFrame = container.children.find((c) => c.type === "FRAME" && c.name === msg.frame_name);
-    if (!templateFrame) throw new Error(`Frame "${msg.frame_name}" not found in "${containerName}".`);
+    // 3. Get slide sources: fixed components for Instagram, or the Flyer
+    // component + the product slides of a selected source Instagram frame.
+    const componentsContainer = page.children.find(
+      (c) => c.name === "Components",
+    );
+    if (!componentsContainer)
+      throw new Error('Container "Components" not found on page.');
 
-    const slide1Template = templateFrame.children.find((c) => c.name === "Slide 1");
-    if (!slide1Template) throw new Error('Slide 1 not found in the template frame.');
+    let coverComponent, slideComponent, flyerComponent, sourceProductSlides;
 
-    const slide2Template = templateFrame.children.find((c) => c.name === "Slide 2");
-    if (!slide2Template) throw new Error('Slide 2 not found in the template frame.');
+    if (!isFlyer) {
+      coverComponent = componentsContainer.children.find(
+        (c) => c.type === "COMPONENT" && c.name === "Instagram Cover",
+      );
+      if (!coverComponent)
+        throw new Error(
+          'Component "Instagram Cover" not found in "Components".',
+        );
+
+      slideComponent = componentsContainer.children.find(
+        (c) => c.type === "COMPONENT" && c.name === "Instagram Slide",
+      );
+      if (!slideComponent)
+        throw new Error(
+          'Component "Instagram Slide" not found in "Components".',
+        );
+    } else {
+      flyerComponent = componentsContainer.children.find(
+        (c) => c.type === "COMPONENT" && c.name === "Flyer",
+      );
+      if (!flyerComponent)
+        throw new Error('Component "Flyer" not found in "Components".');
+
+      const sourceFrame = sourceContainer.children.find(
+        (c) => c.type === "FRAME" && c.name === msg.frame_name,
+      );
+      if (!sourceFrame)
+        throw new Error(`Frame "${msg.frame_name}" not found in "Instagram".`);
+
+      // Identify product slides by structure (has a "Details" or "Price" sub-node)
+      // rather than by node type/position — a slide may have been detached from
+      // its component during manual edits, turning it from INSTANCE into FRAME.
+      sourceProductSlides = sourceFrame.children.filter(
+        (c) =>
+          "children" in c &&
+          (findByName(c, "Details") || findByName(c, "Price")),
+      );
+      if (sourceProductSlides.length === 0)
+        throw new Error("No product slides found in the selected frame.");
+    }
 
     // 4. Load fonts
     progress("Loading fonts…");
@@ -140,59 +316,72 @@ figma.ui.onmessage = async (msg) => {
       figma.loadFontAsync({ family: "DM Sans", style: "Black" }),
     ]);
 
-    // 5. Switch to target page and create parent frame inside the container
-    await figma.setCurrentPageAsync(page);
+    // 5. Create parent frame inside the destination container
+    const productCount = isFlyer
+      ? sourceProductSlides.length
+      : payload.products.length;
+    const newFrameName = formatFrameName(msg.from_date);
 
     const parentFrame = figma.createFrame();
-    parentFrame.name = payload.frame_name;
+    parentFrame.name = newFrameName;
     parentFrame.resize(
-      (payload.products.length + 1) * SLIDE_W + payload.products.length * GAP,
-      SLIDE_H
+      (productCount + 1) * SLIDE_W + productCount * GAP,
+      SLIDE_H,
     );
     parentFrame.fills = [];
     parentFrame.clipsContent = false;
-    container.appendChild(parentFrame);
+    destContainer.appendChild(parentFrame);
 
-    if (msg.mode === "flyer") {
-      parentFrame.layoutMode = "HORIZONTAL";
-      parentFrame.itemSpacing = GAP;
-      parentFrame.primaryAxisSizingMode = "AUTO";
-      parentFrame.counterAxisSizingMode = "AUTO";
-    }
+    parentFrame.layoutMode = "HORIZONTAL";
+    parentFrame.itemSpacing = GAP;
+    parentFrame.primaryAxisSizingMode = "AUTO";
+    parentFrame.counterAxisSizingMode = "AUTO";
 
-    // Position below the last existing frame inside the container
-    const existingFrames = container.children.filter((c) => c.type === "FRAME" && c !== parentFrame);
+    // Position below the last existing frame inside the destination container
+    const existingFrames = destContainer.children.filter(
+      (c) => c.type === "FRAME" && c !== parentFrame,
+    );
     if (existingFrames.length > 0) {
       const last = existingFrames[existingFrames.length - 1];
       parentFrame.x = last.x;
       parentFrame.y = last.y + last.height + 2000;
     }
 
-    // 6. Clone Slide 1 → update validity text (Instagram only — Flyer has no cover slide)
-    if (msg.mode !== "flyer") {
+    // 6. Create Slide 1 → update validity text (Instagram only — Flyer has no cover slide)
+    if (!isFlyer) {
       progress("Creating Slide 1…");
-      const slide1Clone = slide1Template.clone();
-      parentFrame.appendChild(slide1Clone);
-      slide1Clone.x = 0;
-      slide1Clone.y = 0;
+      const slide1Instance = coverComponent.createInstance();
+      parentFrame.appendChild(slide1Instance);
+      slide1Instance.name = "Cover";
+      slide1Instance.x = 0;
+      slide1Instance.y = 0;
 
-      const rules1 = findByName(slide1Clone, "Rules 1");
-      if (rules1 && rules1.type === "TEXT") {
-        rules1.characters = payload.validity_text;
-      }
+      if (msg.validity_date)
+        substituteDateToken(slide1Instance, msg.validity_date);
     }
 
-    // 7. Clone Slide 2 for each product
-    for (let i = 0; i < payload.products.length; i++) {
-      const product = payload.products[i];
-      progress(`Creating slide ${i + 1}/${payload.products.length}: ${product.name}…`);
+    // 7. Create Slide 2 for each product
+    for (let i = 0; i < productCount; i++) {
+      const slide2Instance = isFlyer
+        ? flyerComponent.createInstance()
+        : slideComponent.createInstance();
+      parentFrame.appendChild(slide2Instance);
+      slide2Instance.name = `Product ${i + 1}`;
+      slide2Instance.x = isFlyer
+        ? i * (SLIDE_W + GAP)
+        : (i + 1) * (SLIDE_W + GAP);
+      slide2Instance.y = 0;
 
-      const slide2Clone = slide2Template.clone();
-      parentFrame.appendChild(slide2Clone);
-      slide2Clone.x = msg.mode === "flyer" ? i * (SLIDE_W + GAP) : (i + 1) * (SLIDE_W + GAP);
-      slide2Clone.y = 0;
-
-      await updateSlide2(slide2Clone, product);
+      if (isFlyer) {
+        progress(`Creating flyer ${i + 1}/${productCount}…`);
+        await copyProductVisuals(sourceProductSlides[i], slide2Instance);
+        if (msg.validity_date)
+          substituteDateToken(slide2Instance, msg.validity_date);
+      } else {
+        const product = payload.products[i];
+        progress(`Creating slide ${i + 1}/${productCount}: ${product.name}…`);
+        await updateSlide2(slide2Instance, product);
+      }
     }
 
     // 8. Scroll to new frame
@@ -200,7 +389,7 @@ figma.ui.onmessage = async (msg) => {
 
     figma.ui.postMessage({
       type: "done",
-      text: `${payload.products.length} slide(s) generated — frame "${payload.frame_name}"`,
+      text: `${productCount} slide(s) generated — frame "${newFrameName}"`,
     });
   } catch (err) {
     figma.ui.postMessage({ type: "error", text: err.message });

@@ -1,173 +1,401 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
-    body { padding: 20px; background: #1e1e1e; color: #fff; }
-    h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #00a650; }
-    label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; }
-    input[type="file"] {
-      display: block; width: 100%; font-size: 12px; color: #ccc;
-      background: #2c2c2c; border: 1px solid #444; border-radius: 6px;
-      padding: 8px; cursor: pointer; margin-bottom: 14px;
-    }
-    input[type="file"]::file-selector-button {
-      background: #333; color: #fff; border: none; padding: 4px 10px;
-      border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 8px;
-    }
-    button {
-      width: 100%; padding: 10px; background: #00a650; color: #fff;
-      border: none; border-radius: 6px; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: background 0.15s;
-    }
-    button:hover:not(:disabled) { background: #009045; }
-    button:disabled { background: #555; cursor: not-allowed; }
-    #status {
-      margin-top: 14px; font-size: 12px; line-height: 1.5;
-      color: #ccc; min-height: 18px; word-break: break-word;
-    }
-    #status.error { color: #ff6b6b; }
-    #status.success { color: #00a650; }
-    select {
-      display: block; width: 100%; font-size: 12px; color: #ccc;
-      background: #2c2c2c; border: 1px solid #444; border-radius: 6px;
-      padding: 8px; cursor: pointer; margin-bottom: 14px;
-      appearance: none; -webkit-appearance: none;
-    }
-    select:focus { outline: none; border-color: #00a650; }
-    .radio-group { display: flex; gap: 20px; margin-bottom: 14px; }
-    .radio-group label {
-      display: flex; align-items: center; gap: 6px;
-      color: #ccc; font-size: 12px; cursor: pointer; margin: 0;
-    }
-    input[type="radio"] { accent-color: #00a650; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <h2>FC Sales</h2>
-  <label>Mode:</label>
-  <div class="radio-group">
-    <label><input type="radio" name="mode" value="instagram" checked> Instagram</label>
-    <label><input type="radio" name="mode" value="flyer"> Flyer</label>
-  </div>
-  <label>Figma page:</label>
-  <select id="pageSelect">
-    <option value="" disabled selected>Loading pages…</option>
-  </select>
-  <label>Template frame:</label>
-  <select id="frameSelect" disabled>
-    <option value="" disabled selected>Select a page first…</option>
-  </select>
-  <label>Schema file</label>
-  <input type="file" id="jsonFile" accept=".json" />
-  <button id="btn" disabled>Generate Slides</button>
-  <p id="status">Select a page and the sales JSON file.</p>
+    <head>
+        <meta charset="UTF-8" />
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                font-family: Inter, sans-serif;
+            }
+            body {
+                padding: 20px;
+                background: #1e1e1e;
+                color: #fff;
+            }
+            h2 {
+                font-size: 15px;
+                font-weight: 600;
+                margin-bottom: 16px;
+                color: #00a650;
+            }
+            label {
+                display: block;
+                font-size: 12px;
+                color: #aaa;
+                margin-bottom: 6px;
+            }
+            input[type="file"],
+            input[type="date"] {
+                display: block;
+                width: 100%;
+                font-size: 12px;
+                color: #ccc;
+                background: #2c2c2c;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 8px;
+                cursor: pointer;
+                margin-bottom: 14px;
+            }
+            input[type="date"] {
+                color-scheme: dark;
+                cursor: text;
+            }
+            input[type="file"]::file-selector-button {
+                background: #333;
+                color: #fff;
+                border: none;
+                padding: 4px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                margin-right: 8px;
+            }
+            button {
+                width: 100%;
+                padding: 10px;
+                background: #00a650;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+            button:hover:not(:disabled) {
+                background: #009045;
+            }
+            button:disabled {
+                background: #555;
+                cursor: not-allowed;
+            }
+            #status {
+                margin-top: 14px;
+                font-size: 12px;
+                line-height: 1.5;
+                color: #ccc;
+                min-height: 18px;
+                word-break: break-word;
+            }
+            #status.error {
+                color: #ff6b6b;
+            }
+            #status.success {
+                color: #00a650;
+            }
+            #pageStatus {
+                margin-bottom: 14px;
+                font-size: 12px;
+                line-height: 1.5;
+                padding: 8px 10px;
+                border-radius: 6px;
+                background: #2c2c2c;
+                border: 1px solid #444;
+                color: #ccc;
+            }
+            #pageStatus.ok {
+                color: #00a650;
+                border-color: #00a650;
+            }
+            #pageStatus.warn {
+                color: #ff6b6b;
+                border-color: #ff6b6b;
+            }
+            select {
+                display: block;
+                width: 100%;
+                font-size: 12px;
+                color: #ccc;
+                background: #2c2c2c;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 8px;
+                cursor: pointer;
+                margin-bottom: 14px;
+                appearance: none;
+                -webkit-appearance: none;
+            }
+            select:focus {
+                outline: none;
+                border-color: #00a650;
+            }
+            .radio-group {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 14px;
+            }
+            .radio-group label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                color: #ccc;
+                font-size: 12px;
+                cursor: pointer;
+                margin: 0;
+            }
+            input[type="radio"] {
+                accent-color: #00a650;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>FC Image Tools</h2>
+        <label>Mode:</label>
+        <div class="radio-group">
+            <label
+                ><input type="radio" name="mode" value="instagram" checked />
+                Instagram</label
+            >
+            <label
+                ><input type="radio" name="mode" value="flyer" /> Flyer</label
+            >
+        </div>
+        <div id="pageStatus"></div>
+        <div id="frameGroup">
+            <label>Instagram frame:</label>
+            <select id="frameSelect" disabled>
+                <option value="" disabled selected>Loading…</option>
+            </select>
+        </div>
+        <div id="fromGroup">
+            <label>From:</label>
+            <input type="date" id="fromDate" />
+        </div>
+        <div id="validityGroup">
+            <label>Expires on:</label>
+            <input type="date" id="validityDate" />
+        </div>
+        <div id="jsonGroup">
+            <label>Schema file</label>
+            <input type="file" id="jsonFile" accept=".json" />
+        </div>
+        <button id="btn" disabled>Generate Slides</button>
+        <p id="status">Select the sales JSON file.</p>
 
-  <script>
-    const pageSelect = document.getElementById('pageSelect');
-    const frameSelect = document.getElementById('frameSelect');
-    const fileInput = document.getElementById('jsonFile');
-    const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
+        <script>
+            const pageStatusEl = document.getElementById("pageStatus");
+            let currentPageStatus = null;
+            const frameGroup = document.getElementById("frameGroup");
+            const frameSelect = document.getElementById("frameSelect");
+            const fromGroup = document.getElementById("fromGroup");
+            const fromDate = document.getElementById("fromDate");
+            const validityGroup = document.getElementById("validityGroup");
+            const validityDate = document.getElementById("validityDate");
+            const jsonGroup = document.getElementById("jsonGroup");
+            const fileInput = document.getElementById("jsonFile");
+            const btn = document.getElementById("btn");
+            const status = document.getElementById("status");
 
-    function getMode() {
-      return document.querySelector('input[name="mode"]:checked').value;
-    }
+            function getMode() {
+                return document.querySelector('input[name="mode"]:checked')
+                    .value;
+            }
 
-    function updateBtn() {
-      btn.disabled = !(pageSelect.value && frameSelect.value && fileInput.files.length);
-    }
+            function isFlyer() {
+                return getMode() === "flyer";
+            }
 
-    function requestFrames() {
-      if (!pageSelect.value) return;
-      frameSelect.disabled = true;
-      frameSelect.innerHTML = '<option value="" disabled selected>Loading frames…</option>';
-      updateBtn();
-      parent.postMessage({ pluginMessage: { type: 'get_frames', page_name: pageSelect.value, mode: getMode() } }, '*');
-    }
+            function getMissingRequirements() {
+                if (!currentPageStatus) return ["page status not loaded yet"];
+                const s = currentPageStatus;
+                const missing = [];
+                if (!s.hasComponentsContainer)
+                    missing.push('"Components" container');
+                if (!s.hasInstagramContainer)
+                    missing.push('"Instagram" container');
+                if (isFlyer()) {
+                    if (!s.hasFlyersContainer)
+                        missing.push('"Flyers" container');
+                    if (!s.hasFlyerComponent)
+                        missing.push('"Flyer" component');
+                    if (s.instagramFrames.length === 0)
+                        missing.push('frames inside "Instagram"');
+                } else {
+                    if (!s.hasInstagramCover)
+                        missing.push('"Instagram Cover" component');
+                    if (!s.hasInstagramSlide)
+                        missing.push('"Instagram Slide" component');
+                }
+                return missing;
+            }
 
-    document.querySelectorAll('input[name="mode"]').forEach((r) => {
-      r.addEventListener('change', requestFrames);
-    });
+            function renderPageStatus() {
+                if (!currentPageStatus) {
+                    pageStatusEl.className = "";
+                    pageStatusEl.textContent = "Loading current page…";
+                    return;
+                }
+                const missing = getMissingRequirements();
+                if (missing.length === 0) {
+                    pageStatusEl.className = "ok";
+                    pageStatusEl.textContent = `Page "${currentPageStatus.pageName}": ready.`;
+                } else {
+                    pageStatusEl.className = "warn";
+                    pageStatusEl.textContent =
+                        `Page "${currentPageStatus.pageName}" is missing: ` +
+                        missing.join(", ") +
+                        ".";
+                }
+            }
 
-    pageSelect.addEventListener('change', requestFrames);
+            function renderFrameOptions() {
+                if (!currentPageStatus) return;
+                const frames = currentPageStatus.instagramFrames || [];
+                const previousValue = frameSelect.value;
+                frameSelect.innerHTML = "";
+                if (frames.length === 0) {
+                    frameSelect.innerHTML =
+                        '<option value="" disabled selected>No frames found</option>';
+                    frameSelect.disabled = true;
+                    return;
+                }
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.disabled = true;
+                placeholder.textContent = "Select a frame…";
+                frameSelect.appendChild(placeholder);
+                frames.forEach((name) => {
+                    const opt = document.createElement("option");
+                    opt.value = name;
+                    opt.textContent = name;
+                    frameSelect.appendChild(opt);
+                });
+                if (frames.includes(previousValue)) {
+                    frameSelect.value = previousValue;
+                } else {
+                    placeholder.selected = true;
+                    frameSelect.value = "";
+                }
+                frameSelect.disabled = false;
+            }
 
-    fileInput.addEventListener('change', () => {
-      updateBtn();
-      status.className = '';
-      status.textContent = fileInput.files.length
-        ? `File: ${fileInput.files[0].name}`
-        : 'Select a page and the sales JSON file.';
-    });
+            function updateBtn() {
+                const ready = getMissingRequirements().length === 0;
+                if (isFlyer()) {
+                    btn.disabled = !(
+                        ready &&
+                        frameSelect.value &&
+                        fromDate.value &&
+                        validityDate.value
+                    );
+                } else {
+                    btn.disabled = !(
+                        ready &&
+                        fileInput.files.length &&
+                        fromDate.value &&
+                        validityDate.value
+                    );
+                }
+            }
 
-    btn.addEventListener('click', () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        let payload;
-        try {
-          payload = JSON.parse(e.target.result);
-        } catch {
-          status.className = 'error';
-          status.textContent = 'Error: Invalid JSON.';
-          return;
-        }
-        btn.disabled = true;
-        status.className = '';
-        status.textContent = 'Generating slides…';
-        parent.postMessage({ pluginMessage: { type: 'generate', page_name: pageSelect.value, frame_name: frameSelect.value, mode: getMode(), payload } }, '*');
-      };
-      reader.readAsText(file, 'utf-8');
-    });
+            function updateModeVisibility() {
+                const flyer = isFlyer();
+                frameGroup.style.display = flyer ? "block" : "none";
+                jsonGroup.style.display = flyer ? "none" : "block";
+            }
 
-    window.onmessage = (event) => {
-      const msg = event.data.pluginMessage;
-      if (!msg) return;
-      if (msg.type === 'pages') {
-        pageSelect.innerHTML = '<option value="" disabled selected>Select a page…</option>';
-        msg.pages.forEach((name) => {
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          pageSelect.appendChild(opt);
-        });
-        updateBtn();
-      } else if (msg.type === 'frames') {
-        frameSelect.innerHTML = '';
-        if (msg.frames.length === 0) {
-          frameSelect.innerHTML = '<option value="" disabled selected>No frames found</option>';
-          frameSelect.disabled = true;
-        } else {
-          const placeholder = document.createElement('option');
-          placeholder.value = '';
-          placeholder.disabled = true;
-          placeholder.selected = true;
-          placeholder.textContent = 'Select a frame…';
-          frameSelect.appendChild(placeholder);
-          msg.frames.forEach((name) => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            frameSelect.appendChild(opt);
-          });
-          frameSelect.disabled = false;
-        }
-        updateBtn();
-      } else if (msg.type === 'progress') {
-        status.className = '';
-        status.textContent = msg.text;
-      } else if (msg.type === 'done') {
-        status.className = 'success';
-        status.textContent = msg.text;
-        btn.disabled = false;
-      } else if (msg.type === 'error') {
-        status.className = 'error';
-        status.textContent = 'Error: ' + msg.text;
-        btn.disabled = false;
-      }
-    };
-  </script>
-</body>
+            document.querySelectorAll('input[name="mode"]').forEach((r) => {
+                r.addEventListener("change", () => {
+                    updateModeVisibility();
+                    renderPageStatus();
+                    renderFrameOptions();
+                    updateBtn();
+                });
+            });
+
+            updateModeVisibility();
+            renderPageStatus();
+            renderFrameOptions();
+            updateBtn();
+
+            fromDate.addEventListener("change", updateBtn);
+            validityDate.addEventListener("change", updateBtn);
+
+            fileInput.addEventListener("change", () => {
+                updateBtn();
+                status.className = "";
+                status.textContent = fileInput.files.length
+                    ? `File: ${fileInput.files[0].name}`
+                    : "Select the sales JSON file.";
+            });
+
+            btn.addEventListener("click", () => {
+                if (isFlyer()) {
+                    btn.disabled = true;
+                    status.className = "";
+                    status.textContent = "Generating flyers…";
+                    parent.postMessage(
+                        {
+                            pluginMessage: {
+                                type: "generate",
+                                frame_name: frameSelect.value,
+                                mode: getMode(),
+                                from_date: fromDate.value,
+                                validity_date: validityDate.value,
+                            },
+                        },
+                        "*",
+                    );
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    let payload;
+                    try {
+                        payload = JSON.parse(e.target.result);
+                    } catch {
+                        status.className = "error";
+                        status.textContent = "Error: Invalid JSON.";
+                        return;
+                    }
+                    btn.disabled = true;
+                    status.className = "";
+                    status.textContent = "Generating slides…";
+                    parent.postMessage(
+                        {
+                            pluginMessage: {
+                                type: "generate",
+                                frame_name: frameSelect.value,
+                                mode: getMode(),
+                                from_date: fromDate.value,
+                                validity_date: validityDate.value,
+                                payload,
+                            },
+                        },
+                        "*",
+                    );
+                };
+                reader.readAsText(file, "utf-8");
+            });
+
+            window.onmessage = (event) => {
+                const msg = event.data.pluginMessage;
+                if (!msg) return;
+                if (msg.type === "page_status") {
+                    currentPageStatus = msg;
+                    renderPageStatus();
+                    renderFrameOptions();
+                    updateBtn();
+                } else if (msg.type === "progress") {
+                    status.className = "";
+                    status.textContent = msg.text;
+                } else if (msg.type === "done") {
+                    status.className = "success";
+                    status.textContent = msg.text;
+                    btn.disabled = false;
+                } else if (msg.type === "error") {
+                    status.className = "error";
+                    status.textContent = "Error: " + msg.text;
+                    btn.disabled = false;
+                }
+            };
+        </script>
+    </body>
 </html>
